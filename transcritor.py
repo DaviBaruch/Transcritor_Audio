@@ -160,13 +160,13 @@ def nome_unico(pasta, base):
     return destino
 
 
-def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=None):
+def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=None, origem="de áudio"):
     hoje = hoje or datetime.now().strftime("%Y-%m-%d")
     paragrafos = agrupar_paragrafos(segmentos)
     texto_completo = " ".join(t for _, _, t in segmentos)
     resumo, termos = resumir(texto_completo)
 
-    tags = ["transcricao", "audio"]
+    tags = ["transcricao", "audio"] + (["ao-vivo"] if origem == "ao vivo" else [])
     for t in termos:
         s = slug_tag(t)
         if s and s not in tags and len(tags) < 6:
@@ -183,7 +183,7 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
         "",
         f"# {titulo}",
         "",
-        f"> Transcrição automática de áudio · {hoje} · duração {fmt_tempo(duracao)} · "
+        f"> Transcrição automática {origem} · {hoje} · duração {fmt_tempo(duracao)} · "
         f"idioma `{idioma}` · modelo Whisper `{modelo}` (local, custo 0)",
         "",
         "## Resumo",
@@ -207,22 +207,40 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
     return "\n".join(linhas), meta
 
 
-def gerar_nota(caminho_audio, titulo, destino=DESTINO_PADRAO, modelo=MODELO_PADRAO,
-               idioma="pt", progresso=None):
+def transcrever_trecho(audio, modelo="base", idioma="pt", contexto=""):
+    """Tempo real: `audio` e um numpy float32 mono 16 kHz. Retorna [(inicio, fim, texto)]
+    com tempos relativos ao trecho. `contexto` (fim do texto anterior) ajuda a manter o fio."""
+    wm = carregar_modelo(modelo)
+    lang = None if idioma in (None, "", "auto") else idioma
+    gen, _ = wm.transcribe(audio, language=lang, vad_filter=True, beam_size=1,
+                           condition_on_previous_text=False, initial_prompt=contexto or None)
+    return [(s.start, s.end, s.text.strip()) for s in gen
+            if s.text.strip() and s.no_speech_prob < 0.6]
+
+
+def salvar_nota(titulo, segmentos, duracao, destino=DESTINO_PADRAO, modelo=MODELO_PADRAO,
+                idioma="pt", origem="de áudio"):
+    """Monta a nota .md no vault a partir de segmentos [(inicio, fim, texto)] ja transcritos."""
     if destino not in listar_destinos():
         raise ValueError(f"Destino invalido: {destino}")
     titulo = re.sub(r"\s+", " ", titulo.replace(":", " -")).strip()[:120] or "Transcricao"
-    segmentos, duracao, idioma_det = transcrever(caminho_audio, modelo, idioma, progresso)
     if not segmentos:
         raise RuntimeError("Nenhuma fala detectada no áudio.")
     pasta = VAULT / destino
     hoje = datetime.now().strftime("%Y-%m-%d")
     arquivo = nome_unico(pasta, f"{pascal_case(titulo)}_{hoje.replace('-', '_')}")
-    conteudo, meta = montar_nota(titulo, segmentos, duracao, idioma_det, modelo, destino, hoje)
+    conteudo, meta = montar_nota(titulo, segmentos, duracao, idioma, modelo, destino, hoje, origem)
     arquivo.write_text(conteudo, encoding="utf-8")
-    meta.update(titulo=titulo, criado=hoje, duracao=round(duracao), idioma=idioma_det,
-                modelo=modelo)
+    meta.update(titulo=titulo, criado=hoje, duracao=round(duracao), idioma=idioma, modelo=modelo)
     return arquivo, meta
+
+
+def gerar_nota(caminho_audio, titulo, destino=DESTINO_PADRAO, modelo=MODELO_PADRAO,
+               idioma="pt", progresso=None):
+    if destino not in listar_destinos():
+        raise ValueError(f"Destino invalido: {destino}")
+    segmentos, duracao, idioma_det = transcrever(caminho_audio, modelo, idioma, progresso)
+    return salvar_nota(titulo, segmentos, duracao, destino, modelo, idioma_det)
 
 
 def main():
