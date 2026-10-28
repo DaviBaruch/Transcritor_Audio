@@ -29,16 +29,16 @@ from flask import Flask, jsonify, redirect, request, send_from_directory, sessio
 from dotenv import load_dotenv
 from werkzeug.security import check_password_hash, generate_password_hash
 
-import transcritor as T
-
 AQUI = Path(__file__).resolve().parent
 load_dotenv(AQUI / ".env")
+import transcritor as T
 HISTORICO = AQUI / "historico.json"
-USUARIOS_DADOS = AQUI / "dados_usuarios"
+MODO_PUBLICO = os.getenv("TRANSCRITOR_PUBLIC_MODE", "0") == "1"
+USUARIOS_DADOS = Path(os.getenv("TRANSCRITOR_DATA_ROOT", str(AQUI / "dados_usuarios"))).resolve()
 
 app = Flask(__name__, static_folder=str(AQUI / "static"), static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("TRANSCRITOR_MAX_UPLOAD_MB", "2048")) * 1024 * 1024
-app.config["ALLOW_REGISTRATION"] = os.getenv("TRANSCRITOR_ALLOW_REGISTRATION", "1") == "1"
+app.config["ALLOW_REGISTRATION"] = os.getenv("TRANSCRITOR_ALLOW_REGISTRATION", "0" if MODO_PUBLICO else "1") == "1"
 
 EXTENSOES = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4", ".aac", ".wma", ".opus"}
 JOBS = {}
@@ -52,11 +52,15 @@ def usuario_atual():
 
 
 def vault_usuario():
+    if MODO_PUBLICO:
+        return USUARIOS_DADOS / usuario_atual().capitalize()
     return T.VAULT if usuario_atual() == "davibaruch" else USUARIOS_DADOS / usuario_atual().capitalize()
 
 
 def historico_usuario():
-    return HISTORICO if usuario_atual() == "davibaruch" else vault_usuario() / "historico.json"
+    if MODO_PUBLICO or usuario_atual() != "davibaruch":
+        return vault_usuario() / "historico.json"
+    return HISTORICO
 
 
 def oculta(nome):
@@ -125,7 +129,7 @@ def salvar_historico(itens):
     tmp = historico.with_suffix(".tmp")
     tmp.write_text(json.dumps(itens, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, historico)
-    if usuario_atual() == "davibaruch":
+    if not MODO_PUBLICO and usuario_atual() == "davibaruch":
         commit_historico()
 
 
@@ -485,7 +489,7 @@ def organizar(item_id):
                    else "Nota movida, mas o índice da área não foi alterado (não existe ou já continha o link).")
 
 # ---------------- login (usuario local) ----------------
-USUARIOS = AQUI / "usuarios.json"      # so guarda o HASH da senha, nunca a senha
+USUARIOS = (USUARIOS_DADOS / "usuarios.json") if MODO_PUBLICO else (AQUI / "usuarios.json")
 CHAVE = Path.home() / ".config" / "Transcritor_Audio" / ".chave_sessao"  # fora do repo, seguro
 NOME_OK = re.compile(r"^[A-Za-z0-9._-]{3,32}$")
 FALHAS = {}                            # ip -> [erros seguidos, bloqueado_ate]
@@ -528,6 +532,13 @@ def cabecalhos_seguranca(resposta):
 
 
 def ler_usuarios():
+    if MODO_PUBLICO and not USUARIOS.exists():
+        legado = AQUI / "usuarios.json"
+        try:
+            if legado.exists():
+                return json.loads(legado.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
     try:
         return json.loads(USUARIOS.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -619,6 +630,7 @@ def auth_entrar():
         FALHAS[ip] = [0, time.time() + 60] if erros >= 5 else [erros, 0]
         return jsonify(erro="Usuário ou senha incorretos."), 401
     FALHAS.pop(ip, None)
+    (USUARIOS_DADOS / reg["nome"].capitalize() / "00_Inbox").mkdir(parents=True, exist_ok=True)
     abrir_sessao(chave, d.get("lembrar"))
     return jsonify(ok=True)
 

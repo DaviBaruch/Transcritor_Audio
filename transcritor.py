@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
 import unicodedata
 import urllib.error
@@ -29,6 +30,10 @@ MODELOS = ("tiny", "base", "small", "medium")
 MODELO_PADRAO = "small"
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 OLLAMA_MODELO = "qwen2.5:3b"
+OLLAMA_ATIVO = os.getenv(
+    "TRANSCRITOR_OLLAMA_ENABLED",
+    "0" if os.getenv("TRANSCRITOR_PUBLIC_MODE", "0") == "1" else "1",
+) == "1"
 IA_CACHE = Path(__file__).resolve().parent / "cache_interpretacoes.json"
 
 STOPWORDS = set("""
@@ -160,6 +165,8 @@ def extrair_acoes(texto_completo, limite=8):
 
 
 def interpretar_com_ia(texto_completo):
+    if not OLLAMA_ATIVO:
+        return ""
     """Interpretação final usando Ollama local, sem custo por crédito."""
     if not texto_completo.strip():
         return "*Não houve texto suficiente para interpretar.*"
