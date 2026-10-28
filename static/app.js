@@ -249,7 +249,7 @@ async function iniciar() {
   iniciarBarraAjustavel();
   estado.cfg = await (await fetch('/api/config')).json();
   fetch('/api/perfil').then(r => r.json()).then(p => { aplicarPerfil(p); $('tema').value = p.tema || 'aurora'; });
-  $('sair').onclick = async () => { await fetch('/api/sair', { method: 'POST' }); location.href = '/login'; };
+  $('sair').onclick = async () => { $('user').textContent = ''; if ($('usuario')) $('usuario').value = ''; if ($('senha')) $('senha').value = ''; await fetch('/api/sair', { method: 'POST' }); location.href = '/login'; };
   $('perfil-btn').onclick = () => $('dlg-perfil').showModal();
   $('perfil-foto-btn').onclick = () => $('perfil-arquivo').click();
   $('perfil-arquivo').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $('perfil-img').src = r.result; $('perfil-img').classList.remove('hidden'); $('perfil-letra').classList.add('hidden'); $('perfil-img').dataset.nova = r.result; }; r.readAsDataURL(f); };

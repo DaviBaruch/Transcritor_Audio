@@ -10,6 +10,9 @@ cache_interpretacoes.json
 .chave_sessao
 usuarios.json
 .env
+dados_usuarios/
+historico.json
+*.json.bak
 
 # Áudios temporários e baixados
 *.mp3
@@ -21,3 +24,12 @@ usuarios.json
 *.mp4
 *.aac
 *.opus
+*.mkv
+*.log
+*.sqlite
+*.sqlite3
+*.db
+uploads/
+storage/
+data/
+.pytest_cache/

@@ -7,6 +7,6 @@ from waitress import serve
 from app import app
 
 
-host = os.getenv("TRANSCRITOR_HOST", "127.0.0.1")
-porta = int(os.getenv("TRANSCRITOR_PORT", "5055"))
+host = os.getenv("TRANSCRITOR_HOST", "0.0.0.0")
+porta = int(os.getenv("TRANSCRITOR_PORT") or os.getenv("PORT", "5055"))
 serve(app, host=host, port=porta, threads=int(os.getenv("TRANSCRITOR_THREADS", "4")))
