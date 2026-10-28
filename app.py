@@ -37,6 +37,7 @@ app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024
 
 EXTENSOES = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4", ".aac", ".wma", ".opus"}
 JOBS = {}
+AO_VIVO = {}
 TRAVA_CPU = threading.Lock()
 TRAVA_HIST = threading.Lock()
 
@@ -229,6 +230,81 @@ def enviar():
 @app.get("/status/<job_id>")
 def status(job_id):
     return jsonify(JOBS.get(job_id, {"estado": "erro", "erro": "Tarefa não encontrada.", "progresso": 0}))
+
+
+# ---------------- transcrição ao vivo ----------------
+@app.post("/api/ao-vivo/iniciar")
+def ao_vivo_iniciar():
+    d = request.get_json(silent=True) or {}
+    modelo = str(d.get("modelo", "base"))
+    destino = str(d.get("destino", T.DESTINO_PADRAO))
+    idioma = str(d.get("idioma", "pt"))
+    if modelo not in T.MODELOS or destino not in T.listar_destinos():
+        return jsonify(erro="Modelo ou destino inválido."), 400
+    sessao_id = uuid.uuid4().hex[:10]
+    AO_VIVO[sessao_id] = {
+        "titulo": str(d.get("titulo", "")).strip() or "Gravação ao vivo",
+        "destino": destino, "modelo": modelo, "idioma": idioma,
+        "segmentos": [], "duracao": 0.0, "contexto": ""
+    }
+    return jsonify(id=sessao_id)
+
+
+@app.post("/api/ao-vivo/<sessao_id>/trecho")
+def ao_vivo_trecho(sessao_id):
+    sessao = AO_VIVO.get(sessao_id)
+    if not sessao:
+        return jsonify(erro="Sessão ao vivo não encontrada."), 404
+    if request.mimetype != "application/octet-stream":
+        return jsonify(erro="O trecho precisa ser PCM mono 16 kHz."), 400
+    dados = request.get_data()
+    if len(dados) < 4 or len(dados) % 2:
+        return jsonify(segmentos=[])
+    try:
+        import numpy as np
+        audio = np.frombuffer(dados, dtype="<i2").astype("float32") / 32768.0
+        inicio = max(0.0, float(request.headers.get("X-Inicio", "0")))
+        with TRAVA_CPU:
+            trechos = T.transcrever_trecho(audio, sessao["modelo"], sessao["idioma"], sessao["contexto"])
+    except Exception as exc:
+        return jsonify(erro=f"Falha na transcrição ao vivo: {exc}"), 500
+
+    resposta = []
+    for ini, fim, texto in trechos:
+        absoluto = (inicio + ini, inicio + fim, texto)
+        sessao["segmentos"].append(absoluto)
+        sessao["contexto"] = (sessao["contexto"] + " " + texto).strip()[-600:]
+        resposta.append({"ini": absoluto[0], "fim": absoluto[1], "texto": texto})
+    sessao["duracao"] = max(sessao["duracao"], inicio + (len(dados) / 2) / 16000)
+    return jsonify(segmentos=resposta)
+
+
+@app.post("/api/ao-vivo/<sessao_id>/finalizar")
+def ao_vivo_finalizar(sessao_id):
+    sessao = AO_VIVO.pop(sessao_id, None)
+    if not sessao:
+        return jsonify(erro="Sessão ao vivo não encontrada."), 404
+    try:
+        with TRAVA_CPU:
+            arquivo, meta = T.salvar_nota(sessao["titulo"], sessao["segmentos"], sessao["duracao"],
+                                          sessao["destino"], sessao["modelo"], sessao["idioma"], "ao vivo")
+        item = {"id": uuid.uuid4().hex[:10], "arquivo": arquivo.relative_to(T.VAULT).as_posix(),
+                "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
+                "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
+                "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
+        with TRAVA_HIST:
+            itens = ler_historico()
+            itens.append(item)
+            salvar_historico(itens)
+        return jsonify(ok=True, id=item["id"], arquivo=item["arquivo"])
+    except Exception as exc:
+        return jsonify(erro=str(exc)), 500
+
+
+@app.post("/api/ao-vivo/<sessao_id>/cancelar")
+def ao_vivo_cancelar(sessao_id):
+    AO_VIVO.pop(sessao_id, None)
+    return jsonify(ok=True)
 
 
 @app.get("/api/historico")

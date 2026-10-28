@@ -30,13 +30,15 @@ const DICAS = {
 };
 
 function mostrar(view) {
-  estado.view = view === 'transcrever' ? 'transcrever' : 'historico';
+  estado.view = view === 'transcrever' ? 'transcrever' : (view === 'ao-vivo' ? 'ao-vivo' : 'historico');
   if (view === 'historico') estado.filtro = 'todas';
   if (view === 'organizar') estado.filtro = 'inbox';
   $('v-transcrever').classList.toggle('hidden', estado.view !== 'transcrever');
   $('v-historico').classList.toggle('hidden', estado.view !== 'historico');
+  $('v-ao-vivo').classList.toggle('hidden', estado.view !== 'ao-vivo');
   document.querySelectorAll('.nav').forEach(b => {
     const on = estado.view === 'transcrever' ? b.dataset.nav === 'transcrever'
+      : estado.view === 'ao-vivo' ? b.dataset.nav === 'ao-vivo'
       : b.dataset.nav === (estado.filtro === 'inbox' ? 'organizar' : 'historico');
     b.classList.toggle('on', on);
   });
@@ -213,6 +215,8 @@ function iniciarTranscrever() {
     }, 1200);
   };
 }
+
+window.App = { verHistorico: id => { estado.sel = id; mostrar('historico'); abrirItem(id); } };
 
 async function iniciar() {
   estado.cfg = await (await fetch('/api/config')).json();

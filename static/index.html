@@ -14,6 +14,7 @@
       <button class="nav" data-nav="transcrever"><svg viewBox="0 0 16 16"><path d="M8 1.5a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0V4A2.5 2.5 0 0 0 8 1.5Zm-4 6.5a.75.75 0 0 0-1.5 0 5.5 5.5 0 0 0 4.75 5.45V14.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.05A5.5 5.5 0 0 0 13.5 8 .75.75 0 0 0 12 8a4 4 0 0 1-8 0Z"/></svg>Transcrever</button>
       <button class="nav" data-nav="historico"><svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2ZM.5 8a7.5 7.5 0 1 1 15 0 7.5 7.5 0 0 1-15 0Zm7.5-3.25a.75.75 0 0 1 .75.75v2.19l1.28 1.28a.75.75 0 1 1-1.06 1.06l-1.5-1.5A.75.75 0 0 1 7.25 8V5.5A.75.75 0 0 1 8 4.75Z"/></svg>Histórico<span class="badge" id="b-todas"></span></button>
       <button class="nav" data-nav="organizar"><svg viewBox="0 0 16 16"><path d="M1.5 3.75C1.5 2.78 2.28 2 3.25 2h2.5c.4 0 .78.16 1.06.44L7.62 3.25h5.13c.97 0 1.75.78 1.75 1.75v7.25c0 .97-.78 1.75-1.75 1.75H3.25A1.75 1.75 0 0 1 1.5 12.25v-8.5Z"/></svg>Organizar<span class="badge acc" id="b-pend"></span></button>
+      <button class="nav" data-nav="ao-vivo"><svg viewBox="0 0 16 16"><path d="M8 1.5a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0V4A2.5 2.5 0 0 0 8 1.5ZM3 8a.75.75 0 0 0-1.5 0A6.5 6.5 0 0 0 7 14.38v.87H5.5a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5H9v-.87A6.5 6.5 0 0 0 14.5 8a.75.75 0 0 0-1.5 0 5 5 0 0 1-10 0Z"/></svg>Gravar ao vivo</button>
     </nav>
     <div class="side-foot"><div class="quem"><span id="user"></span><button id="sair" type="button">Sair</button></div>Local · custo 0</div>
   </aside>
@@ -69,6 +70,28 @@
         <div class="detail-pane" id="detalhe"></div>
       </div>
     </section>
+    <section id="v-ao-vivo" class="view hidden">
+      <div class="col live-col">
+        <h1>Gravar e transcrever ao vivo</h1>
+        <p class="sub">Escolha o microfone, o áudio do computador ou os dois. A transcrição aparece enquanto você fala.</p>
+        <div class="live-card">
+          <label class="lbl">Fonte de áudio</label>
+          <select id="av-fonte"><option value="mic">Microfone</option><option value="sistema">Computador (tela ou guia)</option><option value="ambos" selected>Microfone + computador</option></select>
+          <div class="grid3">
+            <div><label class="lbl">Salvar em</label><select id="av-destino"></select></div>
+            <div><label class="lbl">Qualidade</label><select id="av-modelo"><option value="tiny">Rápida · tiny</option><option value="base" selected>Equilibrada · base</option><option value="small">Precisa · small</option></select></div>
+            <div><label class="lbl">Idioma</label><select id="av-idioma"><option value="pt" selected>Português</option><option value="auto">Detectar</option><option value="en">Inglês</option></select></div>
+          </div>
+          <label class="lbl">Título</label><input type="text" id="av-titulo" placeholder="Ex.: Reunião de projeto">
+          <p class="hint" id="av-dica"></p>
+          <label class="check"><input type="checkbox" id="av-guardar" checked> Guardar também o áudio para baixar no final</label>
+          <div id="av-vu" class="vu" aria-label="Nível do áudio"></div>
+          <div class="live-status"><b id="av-tempo">00:00</b><span id="av-estado">Pronto para iniciar</span></div>
+          <button class="btn" id="av-ini">Iniciar gravação</button><button class="btn perigo" id="av-parar" hidden>Parar e salvar</button><button class="btn ghost" id="av-desc" hidden>Descartar</button>
+          <div id="av-msg"></div><div id="av-live" class="live-text"><div class="vazio">A transcrição aparecerá aqui.</div></div><div id="av-fim"></div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 <dialog id="dlg-del">
@@ -83,5 +106,6 @@
 </dialog>
 <script src="/static/fundo.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/aovivo.js"></script>
 </body>
 </html>
