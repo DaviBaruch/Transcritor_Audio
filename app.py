@@ -413,17 +413,23 @@ def organizar(item_id):
 
 # ---------------- login (usuario local) ----------------
 USUARIOS = AQUI / "usuarios.json"      # so guarda o HASH da senha, nunca a senha
-CHAVE = AQUI / ".chave_sessao"         # chave que assina o cookie de sessao
+CHAVE = Path.home() / ".config" / "Transcritor_Audio" / ".chave_sessao"  # fora do repo, seguro
 NOME_OK = re.compile(r"^[A-Za-z0-9._-]{3,32}$")
 FALHAS = {}                            # ip -> [erros seguidos, bloqueado_ate]
 LIVRES = {"static", "pagina_login", "auth_estado", "auth_registrar", "auth_entrar"}
 
 
 def chave_secreta():
+    CHAVE.parent.mkdir(parents=True, exist_ok=True)
     try:
         return CHAVE.read_text(encoding="utf-8").strip()
     except OSError:
-        k = secrets.token_hex(32)
+        # migra a chave antiga (dentro do repo) para o local seguro, se existir
+        antiga = AQUI / ".chave_sessao"
+        try:
+            k = antiga.read_text(encoding="utf-8").strip()
+        except OSError:
+            k = secrets.token_hex(32)
         CHAVE.write_text(k, encoding="utf-8")
         return k
 
