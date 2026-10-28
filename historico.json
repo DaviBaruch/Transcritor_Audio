@@ -140,5 +140,39 @@
    "argila",
    "rocha"
   ]
+ },
+ {
+  "id": "3a9413cf09",
+  "arquivo": "00_Inbox/Tarefa_Colocar_Prisioneiro_No_Telhado_2026_10_28.md",
+  "titulo": "Tarefa colocar prisioneiro no telhado",
+  "criado": "2026-10-28",
+  "duracao": 44,
+  "modelo": "base",
+  "idioma": "pt",
+  "resumo": [
+   "bom a gente vai subir lá em cima, num telhado de novo eu vou pegar a escada de ferro, vou colocar ela embaixo lá no quartinho, lá no quarto e você vai pegar a escada de invadê, ele vai subir lá em cima você vai movimentar a estava lá em cima e vai colocar a parque as arruelas de borracha e as arruelas de ferro vai apertar que nem você fez da última vez, certo?",
+   "Aí depois disso só tem três pínios da colocar, então durante esse processo a gente só vai colocar só três pínios e acabou.",
+   "Depois mais para frente nós vamos fechar a parte de cima do quarto que está aberta, para não chover mais dentro."
+  ],
+  "interpretacao_ia": "### Ideia Central\nA transcrição parece estar descrevendo um processo de montagem de uma estrutura, provavelmente de um telhado, com a participação de duas pessoas: uma que vai subir com uma escada de ferro e outra que vai subir com uma escada de invasão (provavelmente uma escada de madeira).\n\n### Pontos importantes\n- A escada de ferro será colocada embaixo do quarto e a escada de invasão será usada para subir.\n- As arruelas de borracha e de ferro serão montadas, como foi feito anteriormente.\n- Após a montagem das arruelas, apenas três pinos serão necessários para finalizar o trabalho.\n- A parte superior do quarto que está aberta será fechada para evitar chuva.\n\n### Tarefas e prazos\n- A tarefa principal é a montagem das arruelas de borracha e de ferro.\n- As tarefas secundárias incluem a montagem de três pinos e fechar a parte superior do quarto.\n- Não há especificação de prazos, mas a tarefa principal deve ser concluída após a montagem das arruelas.\n\n### Dúvidas ou pontos a confirmar\n- A escada de invasão (escada de madeira) é mencionada, mas não há detalhes sobre sua altura ou se é uma escada de invasão oficial.\n- Não está claro se a escada de ferro será colocada no telhado ou embaixo do quarto.\n- Não está claro se a escada de ferro será usada para subir ou apenas para apoiar a montagem das arruelas.",
+  "acoes": [],
+  "termos": [
+   "colocar",
+   "subir",
+   "pegar",
+   "escada",
+   "ferro",
+   "quarto",
+   "arruelas",
+   "pínios"
+  ],
+  "tags": [
+   "transcricao",
+   "audio",
+   "colocar",
+   "subir",
+   "pegar",
+   "escada"
+  ]
  }
 ]
