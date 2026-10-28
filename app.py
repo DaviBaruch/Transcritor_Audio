@@ -16,6 +16,7 @@ import os
 import re
 import secrets
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
@@ -103,6 +104,36 @@ def salvar_historico(itens):
     tmp = HISTORICO.with_suffix(".tmp")
     tmp.write_text(json.dumps(itens, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, HISTORICO)
+    commit_historico()
+
+
+def commit_historico():
+    """Registra automaticamente alterações do histórico no Git local."""
+    try:
+        subprocess.run(
+            ["git", "add", "--", HISTORICO.name],
+            cwd=AQUI,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        alterado = subprocess.run(
+            ["git", "diff", "--cached", "--quiet", "--", HISTORICO.name],
+            cwd=AQUI,
+            capture_output=True,
+        )
+        if alterado.returncode == 0:
+            return
+        subprocess.run(
+            ["git", "commit", "-m", "Atualiza histórico de transcrições", "--", HISTORICO.name],
+            cwd=AQUI,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        # O histórico já foi salvo; Git não pode derrubar a aplicação.
+        print(f"Aviso: não foi possível fazer commit do histórico: {exc}")
 
 
 def localizar(item, itens=None):

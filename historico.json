@@ -108,74 +108,8 @@
   ]
  },
  {
-  "id": "49cbb06443",
-  "arquivo": "00_Inbox/Gravacao_Ao_Vivo_2026_10_28.md",
-  "titulo": "Gravação ao vivo",
-  "criado": "2026-10-28",
-  "duracao": 58,
-  "modelo": "base",
-  "idioma": "pt",
-  "resumo": [
-   "Capítulo 1 O cérebro é argila, não roxo.",
-   "O que você acredita ser a sua identidade é, na verdade, uma mentira biológica.",
-   "Você apenas condicionou seu cérebro a repetir esses padrões."
-  ],
-  "acoes": [],
-  "termos": [
-   "cérebro",
-   "verdade",
-   "capítulo",
-   "argila",
-   "escute",
-   "atenção",
-   "acredita",
-   "identidade"
-  ],
-  "tags": [
-   "transcricao",
-   "audio",
-   "ao-vivo",
-   "cerebro",
-   "verdade",
-   "capitulo"
-  ]
- },
- {
-  "id": "b0ba116bca",
-  "arquivo": "00_Inbox/Audiobook_NeuroPlastia_2026_10_28.md",
-  "titulo": "Audiobook NeuroPlastia",
-  "criado": "2026-10-28",
-  "duracao": 58,
-  "modelo": "base",
-  "idioma": "pt",
-  "resumo": [
-   "O que você acredita ser a sua identidade é, na verdade, uma mentira biológica.",
-   "Você apenas condicionou seu cérebro a repetir esses padrões.",
-   "A neurociência moderna e o estoisismo antigo convergem em um único..."
-  ],
-  "acoes": [],
-  "termos": [
-   "cérebro",
-   "rocha",
-   "verdade",
-   "capitulum",
-   "argila",
-   "escute",
-   "atenção",
-   "acredita"
-  ],
-  "tags": [
-   "transcricao",
-   "audio",
-   "ao-vivo",
-   "cerebro",
-   "rocha",
-   "verdade"
-  ]
- },
- {
   "id": "89c97f2e70",
-  "arquivo": "00_Inbox/AudioBook_Teste_3_2026_10_28.md",
+  "arquivo": "09_Livros/AudioBook_Teste_3_2026_10_28.md",
   "titulo": "AudioBook Teste 3",
   "criado": "2026-10-28",
   "duracao": 80,
@@ -205,6 +139,37 @@
    "cerebro",
    "argila",
    "rocha"
+  ]
+ },
+ {
+  "id": "ebbc35a08e",
+  "arquivo": "03_Projetos/Teste_Para_Ver_Se_O_Commit_do_Historico_Automatico_Ta_Funcionando_2026_10_28.md",
+  "titulo": "Teste para ver se o commit do historico automatico tá funcionando",
+  "criado": "2026-10-28",
+  "duracao": 11,
+  "modelo": "small",
+  "idioma": "pt",
+  "resumo": [
+   "Meu nome é David Baruch, esse é o teste para ver se o commit funciona."
+  ],
+  "interpretacao_ia": "### Ideia Central\nA transcrição visa verificar se o processo de commit automático está funcionando corretamente.\n\n### Pontos importantes\n- A transcrição é uma verificação do funcionamento do commit automático.\n- O commit foi feito pelo codex (presumivelmente um sistema de controle de versão).\n- O teste foi realizado para verificar se o commit foi feito corretamente.\n\n### Tarefas e prazos\n- Nenhuma tarefa específica foi mencionada.\n- Não há prazos mencionados para essa verificação.\n\n### Dúvidas ou pontos a confirmar\n- É necessário confirmar se o commit foi feito corretamente e se as informações foram transcritas corretamente.\n- É importante verificar se o commit automático está funcionando conforme o esperado.",
+  "acoes": [],
+  "termos": [
+   "commit",
+   "david",
+   "baruch",
+   "teste",
+   "funciona",
+   "automático",
+   "codex"
+  ],
+  "tags": [
+   "transcricao",
+   "audio",
+   "commit",
+   "david",
+   "baruch",
+   "teste"
   ]
  }
 ]
