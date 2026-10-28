@@ -30,6 +30,7 @@
     <label class="lembrar"><input type="checkbox" id="lembrar" checked> Manter conectado por 30 dias</label>
     <button class="btn" id="ok" type="submit">Entrar</button>
     <div id="amsg" role="alert"></div>
+    <button class="login-toggle" id="trocar" type="button">Criar novo usuário</button>
     <p class="nota" id="nota"></p>
   </form>
 </main>
@@ -52,7 +53,18 @@ let criar = false;
   $('nota').textContent = criar
     ? 'Seus dados ficam só neste computador. A senha é guardada com criptografia (hash), nunca em texto puro.'
     : 'Esqueceu a senha? Apague o arquivo usuarios.json da pasta Transcritor_Audio e abra de novo para criar outra.';
+  $('trocar').textContent = criar ? 'Já tenho uma conta' : 'Criar novo usuário';
+  $('trocar').classList.toggle('hidden', !a.cadastro_aberto && !criar);
 })();
+$('trocar').onclick = () => {
+  criar = !criar;
+  $('t').textContent = criar ? 'Crie seu acesso' : 'Bem-vindo de volta';
+  $('s').textContent = criar ? 'Crie um espaço separado para suas transcrições.' : 'Entre para transcrever seus áudios.';
+  $('g-conf').classList.toggle('hidden', !criar); $('conf').required = criar;
+  $('senha').autocomplete = criar ? 'new-password' : 'current-password';
+  $('ok').textContent = criar ? 'Criar conta e entrar' : 'Entrar';
+  $('trocar').textContent = criar ? 'Já tenho uma conta' : 'Criar novo usuário';
+};
 $('olho').onclick = () => {
   const oculta = $('senha').type === 'password';
   $('senha').type = oculta ? 'text' : 'password';

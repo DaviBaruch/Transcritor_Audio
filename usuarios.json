@@ -3,5 +3,10 @@
   "nome": "DaviBaruch",
   "hash": "scrypt:32768:8:1$TMMXBA1sr8csdfTu$4d65f1015c897f92a4217f91fa891776e7011ac126bb307a06948aed21bcbdd94229192499c8e49a3c4501f075b82d498f564d2885dec7f3e73cd0a5fdb4bb97",
   "criado": "2026-10-28"
+ },
+ "gabrielpacheco": {
+  "nome": "gabrielpacheco",
+  "hash": "scrypt:32768:8:1$NZK6Vd8C4yyqEu78$3138646aea5825b0204f1045a5e68f789ddde9ce425de55b3eb1255b9366a238f3f7ed6623d4f1e89df872202260409eb2dc82e36e083b59414dd872fc395876",
+  "criado": "2026-10-28"
  }
 }

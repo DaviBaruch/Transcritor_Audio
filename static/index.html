@@ -16,8 +16,9 @@
       <button class="nav" data-nav="organizar"><svg viewBox="0 0 16 16"><path d="M1.5 3.75C1.5 2.78 2.28 2 3.25 2h2.5c.4 0 .78.16 1.06.44L7.62 3.25h5.13c.97 0 1.75.78 1.75 1.75v7.25c0 .97-.78 1.75-1.75 1.75H3.25A1.75 1.75 0 0 1 1.5 12.25v-8.5Z"/></svg>Organizar<span class="badge acc" id="b-pend"></span></button>
       <button class="nav" data-nav="ao-vivo"><svg viewBox="0 0 16 16"><path d="M8 1.5a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0V4A2.5 2.5 0 0 0 8 1.5ZM3 8a.75.75 0 0 0-1.5 0A6.5 6.5 0 0 0 7 14.38v.87H5.5a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5H9v-.87A6.5 6.5 0 0 0 14.5 8a.75.75 0 0 0-1.5 0 5 5 0 0 1-10 0Z"/></svg>Gravar ao vivo</button>
     </nav>
-    <div class="side-foot"><div class="quem"><span id="user"></span><button id="sair" type="button">Sair</button></div>Local · custo 0</div>
+    <div class="side-foot"><div class="quem"><button class="avatar" id="perfil-btn" type="button"><span id="avatar-letra">?</span><img id="avatar-img" alt=""></button><span id="user"></span><button id="sair" type="button">Sair</button></div>Local · custo 0</div>
   </aside>
+  <div class="resize-handle" id="resize-handle" role="separator" aria-label="Ajustar largura da barra lateral" tabindex="0"></div>
 
   <main>
     <section id="v-transcrever" class="view">
@@ -57,7 +58,7 @@
     <section id="v-historico" class="view hidden">
       <div class="split">
         <div class="list-pane">
-          <div class="list-head">
+          <div class="list-head"><div class="organizar-acoes"><b>Organização</b><button class="btn ghost" id="nova-pasta" type="button">+ Nova pasta</button><button class="btn ghost" id="importar-pastas" type="button">Selecionar pasta do computador</button><input id="pasta-computador" type="file" webkitdirectory directory multiple hidden><small>As subpastas serão importadas para o espaço deste usuário.</small></div>
             <input type="text" id="busca" placeholder="Buscar no histórico">
             <div class="chips" id="chips">
               <button class="chip" data-f="todas">Todas</button>
@@ -103,6 +104,14 @@
     <small>A nota vai para a lixeira do Obsidian (dá para restaurar) e o link no índice da área é removido.</small></div>
   <div id="del-msg" role="status"></div>
   <button class="btn ghost" id="del-cancel" type="button">Cancelar</button>
+</dialog>
+<dialog id="dlg-perfil">
+  <h3>Perfil e aparência</h3>
+  <div class="perfil-top"><button class="avatar grande" id="perfil-foto-btn" type="button"><span id="perfil-letra">?</span><img id="perfil-img" alt=""></button><div><b id="perfil-nome"></b><p>Preferências deste usuário</p></div></div>
+  <input id="perfil-arquivo" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+  <label class="lbl" for="tema">Tema</label>
+  <select id="tema"><option value="aurora">Aurora</option><option value="oceano">Oceano profissional</option><option value="grafite">Grafite executivo</option><option value="floresta">Floresta calma</option><option value="neon">Neon criativo</option><option value="papel">Papel claro</option></select>
+  <div id="perfil-msg"></div><button class="btn" id="perfil-salvar" type="button">Salvar preferências</button><button class="btn ghost" id="perfil-fechar" type="button">Fechar</button>
 </dialog>
 <script src="/static/fundo.js"></script>
 <script src="/static/app.js"></script>

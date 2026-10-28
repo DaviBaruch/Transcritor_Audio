@@ -13,7 +13,7 @@ let S = null;   // sessão de gravação ativa
 
 const msg = (t, c) => { const m = $('av-msg'); m.className = c || ''; m.textContent = t || ''; };
 fetch('/api/config').then(r => r.json()).then(c => {
-  $('av-destino').replaceChildren(...c.destinos.map(d => {
+  $('av-destino').replaceChildren(...c.pastas.map(d => {
     const o = document.createElement('option');
     o.value = d; o.textContent = d.replace(/\//g, ' / '); o.selected = d === c.padrao;
     return o;

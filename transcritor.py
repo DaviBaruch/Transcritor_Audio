@@ -69,8 +69,9 @@ def fmt_tempo(segundos):
     return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
-def listar_destinos():
-    pastas = sorted(p.name for p in VAULT.iterdir()
+def listar_destinos(vault=None):
+    vault = vault or VAULT
+    pastas = sorted(p.name for p in vault.iterdir()
                     if p.is_dir() and re.match(r"^0[0-6]_|^0[89]_", p.name)
                     and p.name != "07_Arquivo")
     return pastas or [DESTINO_PADRAO]
@@ -268,14 +269,15 @@ def transcrever_trecho(audio, modelo="base", idioma="pt", contexto=""):
 
 
 def salvar_nota(titulo, segmentos, duracao, destino=DESTINO_PADRAO, modelo=MODELO_PADRAO,
-                idioma="pt", origem="de áudio"):
+                idioma="pt", origem="de áudio", vault=None):
     """Monta a nota .md no vault a partir de segmentos [(inicio, fim, texto)] ja transcritos."""
-    if destino not in listar_destinos():
+    vault = vault or VAULT
+    if destino not in listar_destinos(vault):
         raise ValueError(f"Destino invalido: {destino}")
     titulo = re.sub(r"\s+", " ", titulo.replace(":", " -")).strip()[:120] or "Transcricao"
     if not segmentos:
         raise RuntimeError("Nenhuma fala detectada no áudio.")
-    pasta = VAULT / destino
+    pasta = vault / destino
     hoje = datetime.now().strftime("%Y-%m-%d")
     arquivo = nome_unico(pasta, f"{pascal_case(titulo)}_{hoje.replace('-', '_')}")
     conteudo, meta = montar_nota(titulo, segmentos, duracao, idioma, modelo, destino, hoje, origem)
@@ -285,11 +287,12 @@ def salvar_nota(titulo, segmentos, duracao, destino=DESTINO_PADRAO, modelo=MODEL
 
 
 def gerar_nota(caminho_audio, titulo, destino=DESTINO_PADRAO, modelo=MODELO_PADRAO,
-               idioma="pt", progresso=None):
-    if destino not in listar_destinos():
+               idioma="pt", progresso=None, vault=None):
+    vault = vault or VAULT
+    if destino not in listar_destinos(vault):
         raise ValueError(f"Destino invalido: {destino}")
     segmentos, duracao, idioma_det = transcrever(caminho_audio, modelo, idioma, progresso)
-    return salvar_nota(titulo, segmentos, duracao, destino, modelo, idioma_det)
+    return salvar_nota(titulo, segmentos, duracao, destino, modelo, idioma_det, vault=vault)
 
 
 def main():

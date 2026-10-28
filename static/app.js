@@ -4,6 +4,19 @@ window.fetch = async (...a) => { const r = await _fetch(...a); if (r.status === 
 const $ = id => document.getElementById(id);
 const estado = { cfg: null, itens: [], filtro: 'todas', busca: '', sel: null, view: 'transcrever' };
 
+function iniciarBarraAjustavel() {
+  const app = document.querySelector('.app'), side = document.querySelector('.side'), handle = $('resize-handle');
+  if (!app || !side || !handle) return;
+  const salvo = Number(localStorage.getItem('largura-barra-lateral'));
+  if (salvo >= 180 && salvo <= 420) side.style.width = salvo + 'px';
+  let arrastando = false;
+  const mover = e => { if (!arrastando) return; const largura = Math.max(180, Math.min(420, e.clientX)); side.style.width = largura + 'px'; };
+  const parar = () => { if (!arrastando) return; arrastando = false; app.classList.remove('redimensionando'); localStorage.setItem('largura-barra-lateral', parseInt(side.getBoundingClientRect().width, 10)); };
+  handle.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' || e.pointerType === 'pen' || e.pointerType === 'touch') { arrastando = true; app.classList.add('redimensionando'); handle.setPointerCapture(e.pointerId); } });
+  handle.addEventListener('pointermove', mover); handle.addEventListener('pointerup', parar); handle.addEventListener('pointercancel', parar);
+  handle.addEventListener('keydown', e => { const atual = side.getBoundingClientRect().width; if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const n = Math.max(180, Math.min(420, atual + (e.key === 'ArrowRight' ? 10 : -10))); side.style.width = n + 'px'; localStorage.setItem('largura-barra-lateral', n); } });
+}
+
 function el(tag, props, ...filhos) {
   const n = document.createElement(tag);
   Object.entries(props || {}).forEach(([k, v]) => {
@@ -22,6 +35,12 @@ function fmtDur(s) {
   return m < 60 ? m + ' min' : Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0');
 }
 const caminho = rel => rel.replace(/\//g, ' / ');
+function aplicarPerfil(p) {
+  document.body.dataset.tema = p.tema || 'aurora';
+  $('user').textContent = p.usuario || '';
+  ['avatar-img', 'perfil-img'].forEach(id => { $(id).src = p.foto || ''; $(id).classList.toggle('hidden', !p.foto); });
+  ['avatar-letra', 'perfil-letra'].forEach(id => { $(id).textContent = (p.usuario || '?')[0].toUpperCase(); $(id).classList.toggle('hidden', !!p.foto); });
+}
 
 const DICAS = {
   base: 'Rápido. Estimativa: ~6 min de espera por hora de áudio (medido em áudio limpo).',
@@ -227,11 +246,38 @@ function iniciarTranscrever() {
 window.App = { verHistorico: id => { estado.sel = id; mostrar('historico'); abrirItem(id); } };
 
 async function iniciar() {
+  iniciarBarraAjustavel();
   estado.cfg = await (await fetch('/api/config')).json();
-  fetch('/api/auth').then(r => r.json()).then(a => { $('user').textContent = a.usuario || ''; });
+  fetch('/api/perfil').then(r => r.json()).then(p => { aplicarPerfil(p); $('tema').value = p.tema || 'aurora'; });
   $('sair').onclick = async () => { await fetch('/api/sair', { method: 'POST' }); location.href = '/login'; };
-  $('destino').replaceChildren(...estado.cfg.destinos.map(d =>
+  $('perfil-btn').onclick = () => $('dlg-perfil').showModal();
+  $('perfil-foto-btn').onclick = () => $('perfil-arquivo').click();
+  $('perfil-arquivo').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $('perfil-img').src = r.result; $('perfil-img').classList.remove('hidden'); $('perfil-letra').classList.add('hidden'); $('perfil-img').dataset.nova = r.result; }; r.readAsDataURL(f); };
+  $('perfil-fechar').onclick = () => $('dlg-perfil').close();
+  $('perfil-salvar').onclick = async () => { const foto = $('perfil-img').dataset.nova || ($('perfil-img').src.startsWith('data:') ? $('perfil-img').src : ''); const r = await fetch('/api/perfil', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ tema: $('tema').value, foto }) }); const j = await r.json(); if (!r.ok) { $('perfil-msg').textContent = j.erro; return; } const p = await (await fetch('/api/perfil')).json(); aplicarPerfil(p); $('dlg-perfil').close(); };
+  $('destino').replaceChildren(...estado.cfg.pastas.map(d =>
     el('option', { value: d, text: caminho(d), ...(d === estado.cfg.padrao ? { selected: 'selected' } : {}) })));
+  $('nova-pasta').onclick = async () => {
+    const nome = prompt('Nome da nova pasta:');
+    if (!nome || !nome.trim()) return;
+    const pai = estado.cfg.pastas[0] || '';
+    const r = await fetch('/api/pastas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: nome.trim(), pai }) });
+    const j = await r.json();
+    if (!r.ok) { alert(j.erro || 'Não foi possível criar a pasta.'); return; }
+    estado.cfg = await (await fetch('/api/config')).json();
+    $('destino').replaceChildren(...estado.cfg.pastas.map(p => el('option', { value: p, text: caminho(p), ...(p === j.pasta ? { selected: 'selected' } : {}) })));
+    if (typeof window.atualizarPastasAoVivo === 'function') window.atualizarPastasAoVivo(estado.cfg.pastas);
+  };
+  $('importar-pastas').onclick = () => $('pasta-computador').click();
+  $('pasta-computador').onchange = async e => {
+    const caminhos = [...e.target.files].map(f => f.webkitRelativePath).filter(Boolean);
+    const r = await fetch('/api/pastas/importar', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ caminhos }) });
+    const j = await r.json();
+    if (!r.ok) { alert(j.erro || 'Não foi possível importar as pastas.'); return; }
+    estado.cfg = await (await fetch('/api/config')).json();
+    alert(`${j.criadas} pasta(s) importada(s).`); e.target.value = '';
+  };
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => mostrar(b.dataset.nav));
   document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
     estado.filtro = c.dataset.f;

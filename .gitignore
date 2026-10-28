@@ -9,6 +9,7 @@ cache_interpretacoes.json
 # Credenciais e dados locais
 .chave_sessao
 usuarios.json
+.env
 
 # Áudios temporários e baixados
 *.mp3
