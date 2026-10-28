@@ -167,6 +167,15 @@ def ligar_no_moc(moc, stem, data):
 PADRAO_CONEXAO = re.compile(r"^← \[\[[^\]]*\]\] \| \[\[Hub_Central\]\]", re.MULTILINE)
 
 
+def extrair_interpretacao(texto):
+    """Lê a seção gerada pela IA diretamente da nota Markdown."""
+    marcador = "## Interpretação IA"
+    if marcador not in texto:
+        return ""
+    parte = texto.split(marcador, 1)[1]
+    return parte.split("\n## ", 1)[0].strip()
+
+
 def processar(job_id, caminho, titulo, destino, modelo, idioma):
     job = JOBS[job_id]
     try:
@@ -177,6 +186,7 @@ def processar(job_id, caminho, titulo, destino, modelo, idioma):
         item = {"id": job_id, "arquivo": arq.relative_to(T.VAULT).as_posix(),
                 "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
                 "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
+                "interpretacao_ia": meta.get("interpretacao_ia", ""),
                 "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
         with TRAVA_HIST:
             itens = ler_historico()
@@ -291,12 +301,14 @@ def ao_vivo_finalizar(sessao_id):
         item = {"id": uuid.uuid4().hex[:10], "arquivo": arquivo.relative_to(T.VAULT).as_posix(),
                 "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
                 "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
+                "interpretacao_ia": meta.get("interpretacao_ia", ""),
                 "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
         with TRAVA_HIST:
             itens = ler_historico()
             itens.append(item)
             salvar_historico(itens)
-        return jsonify(ok=True, id=item["id"], arquivo=item["arquivo"])
+        return jsonify(ok=True, id=item["id"], arquivo=item["arquivo"],
+                       interpretacao_ia=item.get("interpretacao_ia", ""))
     except Exception as exc:
         return jsonify(erro=str(exc)), 500
 
@@ -327,6 +339,7 @@ def item_detalhe(item_id):
     texto = p.read_text(encoding="utf-8", errors="ignore") if p else ""
     base.update(acoes=item.get("acoes", []), termos=item.get("termos", []),
                 resumo=item.get("resumo", []), idioma=item.get("idioma", ""),
+                interpretacao_ia=item.get("interpretacao_ia") or extrair_interpretacao(texto),
                 arquivo=item["arquivo"], transcricao=extrair_transcricao(texto))
     return jsonify(base)
 

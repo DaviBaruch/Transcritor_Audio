@@ -1,7 +1,8 @@
 /* Gravação ao vivo: microfone e/ou áudio do computador -> trechos de fala -> transcrição em tempo real. */
 (() => {
 const $ = id => document.getElementById(id);
-const TAXA = 16000, MIN_S = 4, MAX_S = 14, PAUSA_S = 0.5, LIMIAR = 0.01;
+// Blocos menores deixam a legenda mais responsiva. O resumo fica para o final.
+const TAXA = 16000, MIN_S = 2, MAX_S = 6, PAUSA_S = 0.35, LIMIAR = 0.01;
 const fmt = s => { s = Math.floor(s); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
 const DICAS = {
   tiny: 'Mais rápida, mas erra mais palavras.',
@@ -49,9 +50,21 @@ setInterval(() => {
 function adicionar(seg) {
   const live = $('av-live');
   if (live.querySelector('.vazio')) live.replaceChildren();
+  live.querySelectorAll('.legenda-pendente').forEach(p => p.remove());
   const p = document.createElement('p'), b = document.createElement('b');
   b.textContent = '[' + fmt(seg.ini) + ']';
   p.append(b, seg.texto);
+  live.append(p);
+  live.scrollTop = live.scrollHeight;
+}
+
+function indicarProcessamento(inicio) {
+  const live = $('av-live');
+  if (live.querySelector('.vazio')) live.replaceChildren();
+  live.querySelectorAll('.legenda-pendente').forEach(p => p.remove());
+  const p = document.createElement('p');
+  p.className = 'legenda-pendente';
+  p.textContent = '[' + fmt(inicio) + '] ouvindo e convertendo em legenda…';
   live.append(p);
   live.scrollTop = live.scrollHeight;
 }
@@ -76,6 +89,7 @@ function cortar(s) {
   const pcm = new Int16Array(total); let o = 0;
   for (const b of blocos) for (let i = 0; i < b.length; i++) pcm[o++] = Math.max(-1, Math.min(1, b[i])) * 32767;
   s.fila.push({ inicio, pcm });
+  indicarProcessamento(inicio);
   processarFila(s);
 }
 

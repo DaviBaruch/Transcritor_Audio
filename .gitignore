@@ -1,0 +1,22 @@
+# Ambiente e arquivos gerados localmente
+.venv/
+__pycache__/
+*.pyc
+
+# Cache das interpretações locais
+cache_interpretacoes.json
+
+# Credenciais e dados locais
+.chave_sessao
+usuarios.json
+
+# Áudios temporários e baixados
+*.mp3
+*.wav
+*.m4a
+*.ogg
+*.flac
+*.webm
+*.mp4
+*.aac
+*.opus

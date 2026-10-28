@@ -12,9 +12,13 @@ Uso direto (sem interface):
 """
 
 import argparse
+import hashlib
+import json
 import math
 import re
 import unicodedata
+import urllib.error
+import urllib.request
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +27,9 @@ VAULT = Path(__file__).resolve().parent.parent
 DESTINO_PADRAO = "00_Inbox"
 MODELOS = ("tiny", "base", "small", "medium")
 MODELO_PADRAO = "small"
+OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
+OLLAMA_MODELO = "qwen2.5:3b"
+IA_CACHE = Path(__file__).resolve().parent / "cache_interpretacoes.json"
 
 STOPWORDS = set("""
 a o as os um uma uns umas de do da dos das em no na nos nas por para pra com sem sob sobre entre ate
@@ -151,6 +158,43 @@ def extrair_acoes(texto_completo, limite=8):
     return [f for f in frases if GATILHOS_ACAO.search(f)][:limite]
 
 
+def interpretar_com_ia(texto_completo):
+    """Interpretação final usando Ollama local, sem custo por crédito."""
+    if not texto_completo.strip():
+        return "*Não houve texto suficiente para interpretar.*"
+    chave = hashlib.sha256(texto_completo.encode("utf-8")).hexdigest()
+    try:
+        cache = json.loads(IA_CACHE.read_text(encoding="utf-8")) if IA_CACHE.exists() else {}
+        if chave in cache:
+            return cache[chave]
+    except (OSError, ValueError):
+        cache = {}
+    prompt = f"""Você organiza transcrições em português do Brasil.
+Responda em Markdown com as seções: Ideia central, Pontos importantes,
+Tarefas e prazos, Dúvidas ou pontos a confirmar. Seja objetivo e não invente.
+
+TRANSCRIÇÃO:\n{texto_completo}"""
+    payload = json.dumps({"model": OLLAMA_MODELO, "prompt": prompt,
+                          "stream": False, "options": {"temperature": 0.2}}).encode("utf-8")
+    req = urllib.request.Request(OLLAMA_URL, data=payload,
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resposta:
+            resultado = json.loads(resposta.read().decode("utf-8"))
+        interpretacao = str(resultado.get("response", "")).strip()
+        if not interpretacao:
+            raise RuntimeError("O Ollama não retornou texto.")
+    except (urllib.error.URLError, TimeoutError, ValueError, RuntimeError) as exc:
+        return (f"*Interpretação IA indisponível. Inicie o Ollama e baixe "
+                f"`{OLLAMA_MODELO}`. Detalhe: `{exc}`*")
+    cache[chave] = interpretacao
+    try:
+        IA_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+    return interpretacao
+
+
 def nome_unico(pasta, base):
     destino = pasta / f"{base}.md"
     n = 2
@@ -165,6 +209,7 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
     paragrafos = agrupar_paragrafos(segmentos)
     texto_completo = " ".join(t for _, _, t in segmentos)
     resumo, termos = resumir(texto_completo)
+    interpretacao_ia = interpretar_com_ia(texto_completo)
 
     tags = ["transcricao", "audio"] + (["ao-vivo"] if origem == "ao vivo" else [])
     for t in termos:
@@ -193,6 +238,9 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
         "",
     ]
     linhas += [f"- {f}" for f in resumo] or ["- *(áudio curto demais para resumir)*"]
+    linhas += ["", "## Interpretação IA", "",
+               "*Gerada localmente após o término do áudio. Revise informações importantes.*", "",
+               interpretacao_ia]
     acoes = extrair_acoes(texto_completo)
     if acoes:
         linhas += ["", "## Ações e prazos", "",
@@ -203,7 +251,8 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
     linhas += ["", "## Transcrição completa", ""]
     linhas += [f"**[{fmt_tempo(ini)}]** {texto}\n" for ini, texto in paragrafos]
     linhas += ["---", "", "## Conexões", f"← [[{moc}]] | [[Hub_Central]]", ""]
-    meta = {"resumo": resumo, "acoes": acoes, "termos": termos, "tags": tags}
+    meta = {"resumo": resumo, "interpretacao_ia": interpretacao_ia,
+            "acoes": acoes, "termos": termos, "tags": tags}
     return "\n".join(linhas), meta
 
 

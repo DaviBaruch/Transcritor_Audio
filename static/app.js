@@ -122,6 +122,13 @@ function secaoLista(titulo, itens, cls) {
   return [el('h3', { text: titulo }), el('ul', {}, itens.map(t => el('li', { class: cls || '', text: t })))];
 }
 
+function secaoTexto(titulo, texto) {
+  if (!texto) return null;
+  const corpo = texto.split(/\n+/).filter(Boolean).map(linha =>
+    el('p', { text: linha.replace(/^#{1,6}\s+/, '').replace(/^[-*]\s+/, '') }));
+  return [el('h3', { text: titulo }), el('div', { class: 'interpretacao-ia' }, corpo)];
+}
+
 async function abrirItem(id) {
   estado.sel = id;
   desenharLista();
@@ -158,6 +165,7 @@ async function abrirItem(id) {
     el('div', { class: 'meta' }, el('span', { class: 'dot ' + d.estado }), rotulo, '·', fmtData(d.criado), '·', fmtDur(d.duracao), '·',
       'modelo ' + d.modelo, d.termos.slice(0, 4).map(t => el('span', { class: 'tag', text: t }))),
     secaoLista('Resumo', d.resumo),
+    secaoTexto('Interpretação IA', d.interpretacao_ia),
     d.resumo.length ? el('div', { class: 'nota-fraca', text: 'Resumo extrativo: seleciona frases da fala. Revise antes de confiar nos detalhes.' }) : null,
     secaoLista('Ações e prazos', d.acoes, 'ac'),
     el('h3', { text: 'Transcrição' }), transc || el('div', { class: 'nota-fraca', text: 'Arquivo da nota não encontrado.' }),
