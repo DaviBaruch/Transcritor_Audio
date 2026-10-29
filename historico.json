@@ -174,5 +174,41 @@
    "pegar",
    "escada"
   ]
+ },
+ {
+  "id": "45551ba47a",
+  "arquivo": "00_Inbox/WhatsApp_Ptt_2026_10_29_At_16_26_48_2026_10_29.md",
+  "titulo": "WhatsApp Ptt 2026 10 29 at 16.26.48",
+  "criado": "2026-10-29",
+  "duracao": 17,
+  "modelo": "small",
+  "idioma": "pt",
+  "resumo": [
+   "Não é hoje louça, amanhã tem de novo, depois tem de novo.",
+   "Tenho que cuidar da igreja na sexta, no domingo."
+  ],
+  "interpretacao_ia": "### Ideia Central\nA transcrição parece ser uma série de mensagens ou comandos, não uma transcrição de uma conversa. Ela menciona tarefas diárias e uma compromisso na igreja.\n\n### Pontos importantes\n- Há uma repetição de \"Tchau\" (Tchau) várias vezes.\n- Há uma menção a tarefas diárias, como lavar louça.\n- Há um compromisso na igreja na sexta-feira e no domingo.\n\n### Tarefas e prazos\n- Lavar louça diariamente.\n- Compromisso na igreja na sexta-feira e no domingo.\n\n### Dúvidas ou pontos a confirmar\n- Não há informações suficientes para confirmar a precisão da transcrição ou a natureza da fonte das mensagens.\n- Não há detalhes sobre o contexto ou a natureza das tarefas diárias mencionadas.",
+  "acoes": [
+   "Não é hoje louça, amanhã tem de novo, depois tem de novo.",
+   "Tenho que cuidar da igreja na sexta, no domingo."
+  ],
+  "termos": [
+   "louça",
+   "tchau",
+   "amanhã",
+   "tenho",
+   "cuidar",
+   "igreja",
+   "sexta",
+   "domingo"
+  ],
+  "tags": [
+   "transcricao",
+   "audio",
+   "louca",
+   "tchau",
+   "amanha",
+   "tenho"
+  ]
  }
 ]
