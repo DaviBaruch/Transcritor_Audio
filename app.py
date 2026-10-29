@@ -17,7 +17,6 @@ import re
 import secrets
 import shutil
 import subprocess
-import tempfile
 import threading
 import time
 import uuid
@@ -44,6 +43,10 @@ JOBS = {}
 AO_VIVO = {}
 TRAVA_CPU = threading.Lock()
 TRAVA_HIST = threading.Lock()
+JOBS_DIR = AQUI / ".jobs"
+ARQUIVO_JOBS = JOBS_DIR / "jobs.json"
+JOBS_MAX_IDADE_H = 36
+AO_VIVO_MAX_IDADE_S = 7200
 
 
 def usuario_atual():
@@ -235,27 +238,116 @@ def extrair_interpretacao(texto):
     return parte.split("\n## ", 1)[0].strip()
 
 
-def processar(job_id, caminho, titulo, destino, modelo, idioma, vault, historico, registrar_git):
+def salvar_jobs():
+    """Persiste os jobs no disco para o histórico de tarefas sobreviver a reinicios."""
+    try:
+        JOBS_DIR.mkdir(exist_ok=True)
+        tmp = ARQUIVO_JOBS.with_suffix(".tmp")
+        dados = {i: {k: v for k, v in j.items()
+                     if k in ("estado", "progresso", "erro", "item", "arquivo", "criado_em")}
+                 for i, j in JOBS.items()}
+        tmp.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, ARQUIVO_JOBS)
+    except OSError:
+        pass
+
+
+def expirar_jobs():
+    agora = time.time()
+    velhos = [i for i, j in JOBS.items()
+              if agora - j.get("criado_em", agora) > JOBS_MAX_IDADE_H * 3600]
+    for i in velhos:
+        JOBS.pop(i, None)
+
+
+def carregar_jobs():
+    """Restaura jobs do disco; os que estavam em andamento viram erro (app reiniciou)."""
+    try:
+        dados = json.loads(ARQUIVO_JOBS.read_text(encoding="utf-8")) if ARQUIVO_JOBS.exists() else {}
+    except (OSError, ValueError):
+        dados = {}
+    for i, j in dados.items():
+        if not isinstance(j, dict):
+            continue
+        j = dict(j)
+        if j.get("estado") not in ("ok", "erro"):
+            j.update(estado="erro", progresso=0.0,
+                     erro="O servidor reiniciou durante o processamento. Reenvie o áudio.")
+        JOBS[i] = j
+    try:  # audios de jobs interrompidos nao servem mais
+        for p in JOBS_DIR.glob("*"):
+            if p.name != "jobs.json":
+                p.unlink()
+    except OSError:
+        pass
+    expirar_jobs()
+    salvar_jobs()
+
+
+def interpretar_nota(job_id, caminho_nota, titulo, segmentos, duracao, idioma, modelo, destino,
+                     criado, historico, registrar_git):
+    """Fase IA, fora da trava de CPU: refaz a nota com resumo redigido e interpretacao."""
+    job = JOBS.get(job_id)
+    try:
+        texto = " ".join(s[2] for s in segmentos)
+        resumo_ia = T.resumir_com_ia(texto) if T.OLLAMA_ATIVO else ""
+        interpretacao = T.interpretar_com_ia(texto)
+        conteudo, _ = T.montar_nota(titulo, segmentos, duracao, idioma, modelo, destino,
+                                    hoje=criado, resumo_ia=resumo_ia,
+                                    interpretacao_ia=interpretacao)
+        caminho_nota.write_text(conteudo, encoding="utf-8")
+        with TRAVA_HIST:
+            itens = ler_historico(historico)
+            item = next((i for i in itens if i["id"] == job_id), None)
+            if item:
+                item["interpretacao_ia"] = interpretacao
+                item["resumo_ia"] = resumo_ia
+                salvar_historico_em(itens, historico, registrar_git=registrar_git)
+    except Exception as exc:
+        print(f"Aviso: interpretacao IA de {job_id} falhou: {exc}")
+    finally:
+        if job:
+            job.update(estado="ok", progresso=1.0)
+            salvar_jobs()
+
+
+def processar(job_id, caminho, titulo, destino, modelo, idioma, vault, historico, registrar_git,
+              origem="de áudio"):
     job = JOBS[job_id]
     try:
+        if not T.modelo_em_cache(modelo):
+            job.update(estado="baixando", progresso=0.0)
+            salvar_jobs()
+            T.baixar_modelo(modelo, progresso=lambda f, t: job.__setitem__("progresso", min(f / max(t, 1), 1.0)))
         with TRAVA_CPU:
-            job["estado"] = "processando"
-            arq, meta = T.gerar_nota(caminho, titulo, destino, modelo, idioma,
-                                     progresso=lambda p: job.__setitem__("progresso", p),
-                                     vault=vault)
-        item = {"id": job_id, "arquivo": arq.relative_to(vault).as_posix(),
-                "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
-                "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
-                "interpretacao_ia": meta.get("interpretacao_ia", ""),
-                "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
+            job.update(estado="processando", progresso=0.0)
+            salvar_jobs()
+            segmentos, duracao, idioma_det = T.transcrever(
+                caminho, modelo, idioma, progresso=lambda p: job.__setitem__("progresso", p))
+        if not segmentos:
+            raise RuntimeError("Nenhuma fala detectada no áudio.")
         with TRAVA_HIST:
+            arq, meta = T.salvar_nota(titulo, segmentos, duracao, destino, modelo, idioma_det,
+                                      origem, vault=vault,
+                                      resumo_ia="", interpretacao_ia=T.PLACEHOLDER_IA)
+            item = {"id": job_id, "arquivo": arq.relative_to(vault).as_posix(),
+                    "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
+                    "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
+                    "resumo_ia": meta.get("resumo_ia", ""),
+                    "interpretacao_ia": meta.get("interpretacao_ia", ""),
+                    "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
             itens = ler_historico(historico)
             itens.append(item)
             salvar_historico_em(itens, historico, registrar_git=registrar_git)
-        job.update(estado="ok", progresso=1.0, item=job_id, arquivo=item["arquivo"])
+        job.update(estado="interpretando", progresso=1.0, item=job_id, arquivo=item["arquivo"])
+        salvar_jobs()
+        threading.Thread(target=interpretar_nota, daemon=True,
+                         args=(job_id, arq, titulo, segmentos, duracao, idioma_det, modelo, destino,
+                               meta["criado"], historico, registrar_git)).start()
     except Exception as exc:
         job.update(estado="erro", erro=str(exc))
     finally:
+        salvar_jobs()
         try:
             os.remove(caminho)
         except OSError:
@@ -335,14 +427,16 @@ def enviar():
         return jsonify(erro="Modelo ou destino inválido."), 400
     titulo = request.form.get("titulo", "").strip() or Path(f.filename).stem
     idioma = request.form.get("idioma", "pt")
-    fd, caminho = tempfile.mkstemp(suffix=ext)
-    os.close(fd)
-    f.save(caminho)
+    expirar_jobs()
     job_id = uuid.uuid4().hex[:10]
+    JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    caminho = JOBS_DIR / f"{job_id}{ext}"
+    f.save(caminho)
     usuario = usuario_atual()
     vault = vault_usuario()
     historico = historico_usuario()
-    JOBS[job_id] = {"estado": "fila", "progresso": 0.0}
+    JOBS[job_id] = {"estado": "fila", "progresso": 0.0, "criado_em": time.time()}
+    salvar_jobs()
     threading.Thread(target=processar,
                      args=(job_id, caminho, titulo, destino, modelo, idioma, vault, historico,
                            usuario == "davibaruch"),
@@ -352,12 +446,22 @@ def enviar():
 
 @app.get("/status/<job_id>")
 def status(job_id):
+    expirar_jobs()
     return jsonify(JOBS.get(job_id, {"estado": "erro", "erro": "Tarefa não encontrada.", "progresso": 0}))
 
 
 # ---------------- transcrição ao vivo ----------------
+def expirar_sessoes():
+    agora = time.time()
+    velhas = [s for s, v in AO_VIVO.items()
+              if agora - v.get("ultima_atividade", agora) > AO_VIVO_MAX_IDADE_S]
+    for s in velhas:
+        AO_VIVO.pop(s, None)
+
+
 @app.post("/api/ao-vivo/iniciar")
 def ao_vivo_iniciar():
+    expirar_sessoes()
     d = request.get_json(silent=True) or {}
     modelo = str(d.get("modelo", "base"))
     destino = str(d.get("destino", T.DESTINO_PADRAO))
@@ -368,7 +472,8 @@ def ao_vivo_iniciar():
     AO_VIVO[sessao_id] = {
         "titulo": str(d.get("titulo", "")).strip() or "Gravação ao vivo",
         "destino": destino, "modelo": modelo, "idioma": idioma,
-        "segmentos": [], "duracao": 0.0, "contexto": ""
+        "segmentos": [], "duracao": 0.0, "contexto": "",
+        "ultima_atividade": time.time()
     }
     return jsonify(id=sessao_id)
 
@@ -378,6 +483,7 @@ def ao_vivo_trecho(sessao_id):
     sessao = AO_VIVO.get(sessao_id)
     if not sessao:
         return jsonify(erro="Sessão ao vivo não encontrada."), 404
+    sessao["ultima_atividade"] = time.time()
     if request.mimetype != "application/octet-stream":
         return jsonify(erro="O trecho precisa ser PCM mono 16 kHz."), 400
     dados = request.get_data()
@@ -408,19 +514,25 @@ def ao_vivo_finalizar(sessao_id):
     if not sessao:
         return jsonify(erro="Sessão ao vivo não encontrada."), 404
     try:
-        with TRAVA_CPU:
-            arquivo, meta = T.salvar_nota(sessao["titulo"], sessao["segmentos"], sessao["duracao"],
-                                          sessao["destino"], sessao["modelo"], sessao["idioma"], "ao vivo",
-                                          vault=vault_usuario())
-        item = {"id": uuid.uuid4().hex[:10], "arquivo": arquivo.relative_to(vault_usuario()).as_posix(),
-                "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
-                "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
-                "interpretacao_ia": meta.get("interpretacao_ia", ""),
-                "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
         with TRAVA_HIST:
+            arquivo, meta = T.salvar_nota(sessao["titulo"], sessao["segmentos"], sessao["duracao"],
+                                          sessao["destino"], sessao["modelo"], sessao["idioma"],
+                                          "ao vivo", vault=vault_usuario(),
+                                          resumo_ia="", interpretacao_ia=T.PLACEHOLDER_IA)
+            item = {"id": uuid.uuid4().hex[:10], "arquivo": arquivo.relative_to(vault_usuario()).as_posix(),
+                    "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
+                    "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
+                    "resumo_ia": meta.get("resumo_ia", ""),
+                    "interpretacao_ia": meta.get("interpretacao_ia", ""),
+                    "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
             itens = ler_historico()
             itens.append(item)
             salvar_historico(itens)
+        threading.Thread(target=interpretar_nota, daemon=True,
+                         args=(item["id"], arquivo, sessao["titulo"], sessao["segmentos"],
+                               sessao["duracao"], sessao["idioma"], sessao["modelo"],
+                               sessao["destino"], meta["criado"], historico_usuario(),
+                               usuario_atual() == "davibaruch")).start()
         return jsonify(ok=True, id=item["id"], arquivo=item["arquivo"],
                        interpretacao_ia=item.get("interpretacao_ia", ""))
     except Exception as exc:
@@ -452,7 +564,8 @@ def item_detalhe(item_id):
         p = localizar(item, itens)
     texto = p.read_text(encoding="utf-8", errors="ignore") if p else ""
     base.update(acoes=item.get("acoes", []), termos=item.get("termos", []),
-                resumo=item.get("resumo", []), idioma=item.get("idioma", ""),
+                resumo=item.get("resumo", []), resumo_ia=item.get("resumo_ia", ""),
+                idioma=item.get("idioma", ""),
                 interpretacao_ia=item.get("interpretacao_ia") or extrair_interpretacao(texto),
                 arquivo=item["arquivo"], transcricao=extrair_transcricao(texto))
     return jsonify(base)
@@ -701,6 +814,7 @@ def excluir(item_id):
 
 
 if __name__ == "__main__":
+    carregar_jobs()
     porta = int(os.getenv("TRANSCRITOR_PORT", "5055"))
     threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{porta}")).start()
     app.run(host="127.0.0.1", port=porta, debug=False)

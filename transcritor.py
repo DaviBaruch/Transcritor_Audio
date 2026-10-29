@@ -32,6 +32,9 @@ OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 OLLAMA_MODELO = "qwen2.5:3b"
 OLLAMA_ATIVO = os.getenv("TRANSCRITOR_OLLAMA_ENABLED", "1") == "1"
 IA_CACHE = Path(__file__).resolve().parent / "cache_interpretacoes.json"
+CPU_THREADS = int(os.getenv("TRANSCRITOR_THREADS", "0") or 0)
+USAR_CONTEXTO = os.getenv("TRANSCRITOR_CONTEXTO", "1") != "0"
+PLACEHOLDER_IA = "*Gerando interpretação IA...*"
 
 STOPWORDS = set("""
 a o as os um uma uns umas de do da dos das em no na nos nas por para pra com sem sob sobre entre ate
@@ -87,7 +90,10 @@ def carregar_modelo(nome):
         raise ValueError(f"Modelo invalido: {nome}")
     if nome not in _modelos_carregados:
         from faster_whisper import WhisperModel
-        _modelos_carregados[nome] = WhisperModel(nome, device="cpu", compute_type="int8")
+        kwargs = {"device": "cpu", "compute_type": "int8"}
+        if CPU_THREADS > 0:
+            kwargs["cpu_threads"] = CPU_THREADS
+        _modelos_carregados[nome] = WhisperModel(nome, **kwargs)
     return _modelos_carregados[nome]
 
 
@@ -96,7 +102,7 @@ def transcrever(caminho_audio, modelo=MODELO_PADRAO, idioma="pt", progresso=None
     wm = carregar_modelo(modelo)
     lang = None if idioma in (None, "", "auto") else idioma
     gen, info = wm.transcribe(str(caminho_audio), language=lang, vad_filter=True,
-                              beam_size=1, condition_on_previous_text=False)
+                              beam_size=1, condition_on_previous_text=USAR_CONTEXTO)
     segmentos = []
     for seg in gen:
         texto = seg.text.strip()
@@ -200,6 +206,40 @@ TRANSCRIÇÃO:\n{texto_completo}"""
     return interpretacao
 
 
+def resumir_com_ia(texto_completo):
+    """Resumo redigido via Ollama local; retorna "" se indisponível (fallback extrativo)."""
+    if not OLLAMA_ATIVO or not texto_completo.strip():
+        return ""
+    chave = "resumo:" + hashlib.sha256(texto_completo.encode("utf-8")).hexdigest()
+    try:
+        cache = json.loads(IA_CACHE.read_text(encoding="utf-8")) if IA_CACHE.exists() else {}
+        if chave in cache:
+            return cache[chave]
+    except (OSError, ValueError):
+        cache = {}
+    prompt = ("Resuma a transcrição abaixo em 3 a 5 frases objetivas em português do Brasil. "
+              "Parágrafo único, sem listas, sem cabeçalhos e sem inventar informação.\n\n"
+              f"TRANSCRIÇÃO:\n{texto_completo}")
+    payload = json.dumps({"model": OLLAMA_MODELO, "prompt": prompt,
+                          "stream": False, "options": {"temperature": 0.2}}).encode("utf-8")
+    req = urllib.request.Request(OLLAMA_URL, data=payload,
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resposta:
+            resultado = json.loads(resposta.read().decode("utf-8"))
+        resumo = str(resultado.get("response", "")).strip()
+        if not resumo:
+            return ""
+    except (urllib.error.URLError, TimeoutError, ValueError, RuntimeError):
+        return ""
+    cache[chave] = resumo
+    try:
+        IA_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+    return resumo
+
+
 def nome_unico(pasta, base):
     destino = pasta / f"{base}.md"
     n = 2
@@ -209,12 +249,16 @@ def nome_unico(pasta, base):
     return destino
 
 
-def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=None, origem="de áudio"):
+def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=None,
+                origem="de áudio", resumo_ia=None, interpretacao_ia=None):
     hoje = hoje or datetime.now().strftime("%Y-%m-%d")
     paragrafos = agrupar_paragrafos(segmentos)
     texto_completo = " ".join(t for _, _, t in segmentos)
     resumo, termos = resumir(texto_completo)
-    interpretacao_ia = interpretar_com_ia(texto_completo)
+    if interpretacao_ia is None:
+        interpretacao_ia = interpretar_com_ia(texto_completo)
+    if resumo_ia is None:
+        resumo_ia = resumir_com_ia(texto_completo)
 
     tags = ["transcricao", "audio"] + (["ao-vivo"] if origem == "ao vivo" else [])
     for t in termos:
@@ -238,10 +282,13 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
         "",
         "## Resumo",
         "",
-        "*Resumo extrativo gerado automaticamente: seleciona as frases mais representativas "
-        "da fala, sem reescrever. Revise antes de confiar em detalhes.*",
-        "",
     ]
+    if resumo_ia:
+        linhas += ["*Resumo gerado por IA local (Ollama). Revise pontos importantes.*", "",
+                   resumo_ia, "", "### Pontos-chave (frases do áudio)", ""]
+    else:
+        linhas += ["*Resumo extrativo gerado automaticamente: seleciona as frases mais representativas "
+                   "da fala, sem reescrever. Revise antes de confiar em detalhes.*", ""]
     linhas += [f"- {f}" for f in resumo] or ["- *(áudio curto demais para resumir)*"]
     linhas += ["", "## Interpretação IA", "",
                "*Gerada localmente após o término do áudio. Revise informações importantes.*", "",
@@ -256,7 +303,7 @@ def montar_nota(titulo, segmentos, duracao, idioma, modelo, pasta_destino, hoje=
     linhas += ["", "## Transcrição completa", ""]
     linhas += [f"**[{fmt_tempo(ini)}]** {texto}\n" for ini, texto in paragrafos]
     linhas += ["---", "", "## Conexões", f"← [[{moc}]] | [[Hub_Central]]", ""]
-    meta = {"resumo": resumo, "interpretacao_ia": interpretacao_ia,
+    meta = {"resumo": resumo, "resumo_ia": resumo_ia, "interpretacao_ia": interpretacao_ia,
             "acoes": acoes, "termos": termos, "tags": tags}
     return "\n".join(linhas), meta
 
@@ -273,7 +320,7 @@ def transcrever_trecho(audio, modelo="base", idioma="pt", contexto=""):
 
 
 def salvar_nota(titulo, segmentos, duracao, destino=DESTINO_PADRAO, modelo=MODELO_PADRAO,
-                idioma="pt", origem="de áudio", vault=None):
+                idioma="pt", origem="de áudio", vault=None, resumo_ia=None, interpretacao_ia=None):
     """Monta a nota .md no vault a partir de segmentos [(inicio, fim, texto)] ja transcritos."""
     vault = vault or VAULT
     if destino not in listar_destinos(vault):
@@ -284,7 +331,8 @@ def salvar_nota(titulo, segmentos, duracao, destino=DESTINO_PADRAO, modelo=MODEL
     pasta = vault / destino
     hoje = datetime.now().strftime("%Y-%m-%d")
     arquivo = nome_unico(pasta, f"{pascal_case(titulo)}_{hoje.replace('-', '_')}")
-    conteudo, meta = montar_nota(titulo, segmentos, duracao, idioma, modelo, destino, hoje, origem)
+    conteudo, meta = montar_nota(titulo, segmentos, duracao, idioma, modelo, destino, hoje, origem,
+                                 resumo_ia=resumo_ia, interpretacao_ia=interpretacao_ia)
     arquivo.write_text(conteudo, encoding="utf-8")
     meta.update(titulo=titulo, criado=hoje, duracao=round(duracao), idioma=idioma, modelo=modelo)
     return arquivo, meta
@@ -297,6 +345,35 @@ def gerar_nota(caminho_audio, titulo, destino=DESTINO_PADRAO, modelo=MODELO_PADR
         raise ValueError(f"Destino invalido: {destino}")
     segmentos, duracao, idioma_det = transcrever(caminho_audio, modelo, idioma, progresso)
     return salvar_nota(titulo, segmentos, duracao, destino, modelo, idioma_det, vault=vault)
+
+
+def modelo_em_cache(nome):
+    """True se o modelo Whisper ja esta baixado no cache do HuggingFace."""
+    from huggingface_hub import try_to_load_from_cache
+    return bool(try_to_load_from_cache(f"Systran/faster-whisper-{nome}", "model.bin"))
+
+
+def baixar_modelo(nome, progresso=None):
+    """Baixa o modelo para o cache padrao do HuggingFace.
+    progresso(feito, total) e chamado com bytes do arquivo em andamento."""
+    from huggingface_hub import hf_hub_download, list_repo_files
+    from tqdm import tqdm
+    repo = f"Systran/faster-whisper-{nome}"
+
+    class _Barra(tqdm):
+        def __init__(self, *args, **kwargs):
+            kwargs["disable"] = True  # o percentual aparece no frontend, nao no console
+            super().__init__(*args, **kwargs)
+
+        def update(self, n=1):
+            super().update(n)
+            if progresso and self.total:
+                progresso(self.n, self.total)
+
+    for arquivo in list_repo_files(repo):
+        if arquivo == ".gitattributes":
+            continue
+        hf_hub_download(repo, arquivo, tqdm_class=_Barra)
 
 
 def main():

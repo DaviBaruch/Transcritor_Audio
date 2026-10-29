@@ -183,9 +183,9 @@ async function abrirItem(id) {
     el('h2', { text: d.titulo }),
     el('div', { class: 'meta' }, el('span', { class: 'dot ' + d.estado }), rotulo, '·', fmtData(d.criado), '·', fmtDur(d.duracao), '·',
       'modelo ' + d.modelo, d.termos.slice(0, 4).map(t => el('span', { class: 'tag', text: t }))),
-    secaoLista('Resumo', d.resumo),
+    d.resumo_ia ? secaoTexto('Resumo', d.resumo_ia) : secaoLista('Resumo', d.resumo),
     secaoTexto('Interpretação IA', d.interpretacao_ia),
-    d.resumo.length ? el('div', { class: 'nota-fraca', text: 'Resumo extrativo: seleciona frases da fala. Revise antes de confiar nos detalhes.' }) : null,
+    (!d.resumo_ia && d.resumo.length) ? el('div', { class: 'nota-fraca', text: 'Resumo extrativo: seleciona frases da fala. Revise antes de confiar nos detalhes.' }) : null,
     secaoLista('Ações e prazos', d.acoes, 'ac'),
     el('h3', { text: 'Transcrição' }), transc || el('div', { class: 'nota-fraca', text: 'Arquivo da nota não encontrado.' }),
     d.estado === 'ausente' ? null : el('div', { class: 'org' },
@@ -229,8 +229,12 @@ function iniciarTranscrever() {
       const s = await (await fetch('/status/' + j.id)).json();
       $('barra').firstChild.style.width = Math.max(2, Math.round(s.progresso * 100)) + '%';
       if (s.estado === 'fila') msg('Na fila (outro áudio está sendo processado)...');
+      else if (s.estado === 'baixando')
+        msg('Baixando o modelo Whisper (1ª vez)... ' + Math.max(1, Math.round(s.progresso * 100)) + '%');
       else if (s.estado === 'processando')
         msg(s.progresso <= 0.01 ? 'Carregando o modelo (na 1ª vez baixa o arquivo)...' : 'Transcrevendo... ' + Math.round(s.progresso * 100) + '%');
+      else if (s.estado === 'interpretando')
+        msg('Transcrição pronta. Gerando resumo e interpretação IA...');
       else if (s.estado === 'ok') {
         clearInterval(t);
         estado.sel = s.item;
