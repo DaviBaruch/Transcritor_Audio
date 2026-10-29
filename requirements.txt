@@ -1,4 +1,6 @@
 Flask>=3.0,<4
 numpy>=2.0,<3
 faster-whisper>=1.1,<2
+# av 17+ removeu o parametro metadata_errors usado pelo faster-whisper 1.2.x
+av==16.1.0
 python-dotenv>=1.0,<2
