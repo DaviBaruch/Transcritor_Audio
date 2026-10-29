@@ -110,8 +110,8 @@ def validar_destino(rel):
     return destino, partes
 
 
-def ler_historico():
-    historico = historico_usuario()
+def ler_historico(caminho=None):
+    historico = caminho or historico_usuario()
     if not historico.exists():
         return []
     try:
@@ -120,14 +120,18 @@ def ler_historico():
         return []
 
 
-def salvar_historico(itens):
-    historico = historico_usuario()
+def salvar_historico_em(itens, historico, registrar_git=False):
     historico.parent.mkdir(parents=True, exist_ok=True)
     tmp = historico.with_suffix(".tmp")
     tmp.write_text(json.dumps(itens, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, historico)
-    if usuario_atual() == "davibaruch":
+    if registrar_git:
         commit_historico()
+
+
+def salvar_historico(itens):
+    usuario = usuario_atual()
+    salvar_historico_em(itens, historico_usuario(), registrar_git=usuario == "davibaruch")
 
 
 def commit_historico():
@@ -231,23 +235,23 @@ def extrair_interpretacao(texto):
     return parte.split("\n## ", 1)[0].strip()
 
 
-def processar(job_id, caminho, titulo, destino, modelo, idioma):
+def processar(job_id, caminho, titulo, destino, modelo, idioma, vault, historico, registrar_git):
     job = JOBS[job_id]
     try:
         with TRAVA_CPU:
             job["estado"] = "processando"
             arq, meta = T.gerar_nota(caminho, titulo, destino, modelo, idioma,
                                      progresso=lambda p: job.__setitem__("progresso", p),
-                                     vault=vault_usuario())
-        item = {"id": job_id, "arquivo": arq.relative_to(vault_usuario()).as_posix(),
+                                     vault=vault)
+        item = {"id": job_id, "arquivo": arq.relative_to(vault).as_posix(),
                 "titulo": meta["titulo"], "criado": meta["criado"], "duracao": meta["duracao"],
                 "modelo": meta["modelo"], "idioma": meta["idioma"], "resumo": meta["resumo"],
                 "interpretacao_ia": meta.get("interpretacao_ia", ""),
                 "acoes": meta["acoes"], "termos": meta["termos"], "tags": meta["tags"]}
         with TRAVA_HIST:
-            itens = ler_historico()
+            itens = ler_historico(historico)
             itens.append(item)
-            salvar_historico(itens)
+            salvar_historico_em(itens, historico, registrar_git=registrar_git)
         job.update(estado="ok", progresso=1.0, item=job_id, arquivo=item["arquivo"])
     except Exception as exc:
         job.update(estado="erro", erro=str(exc))
@@ -335,8 +339,13 @@ def enviar():
     os.close(fd)
     f.save(caminho)
     job_id = uuid.uuid4().hex[:10]
+    usuario = usuario_atual()
+    vault = vault_usuario()
+    historico = historico_usuario()
     JOBS[job_id] = {"estado": "fila", "progresso": 0.0}
-    threading.Thread(target=processar, args=(job_id, caminho, titulo, destino, modelo, idioma),
+    threading.Thread(target=processar,
+                     args=(job_id, caminho, titulo, destino, modelo, idioma, vault, historico,
+                           usuario == "davibaruch"),
                      daemon=True).start()
     return jsonify(id=job_id)
 
