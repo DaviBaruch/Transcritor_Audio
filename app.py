@@ -33,12 +33,11 @@ AQUI = Path(__file__).resolve().parent
 load_dotenv(AQUI / ".env")
 import transcritor as T
 HISTORICO = AQUI / "historico.json"
-MODO_PUBLICO = os.getenv("TRANSCRITOR_PUBLIC_MODE", "0") == "1"
-USUARIOS_DADOS = Path(os.getenv("TRANSCRITOR_DATA_ROOT", str(AQUI / "dados_usuarios"))).resolve()
+USUARIOS_DADOS = AQUI / "dados_usuarios"
 
 app = Flask(__name__, static_folder=str(AQUI / "static"), static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("TRANSCRITOR_MAX_UPLOAD_MB", "2048")) * 1024 * 1024
-app.config["ALLOW_REGISTRATION"] = os.getenv("TRANSCRITOR_ALLOW_REGISTRATION", "0" if MODO_PUBLICO else "1") == "1"
+app.config["ALLOW_REGISTRATION"] = True
 
 EXTENSOES = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4", ".aac", ".wma", ".opus"}
 JOBS = {}
@@ -52,13 +51,11 @@ def usuario_atual():
 
 
 def vault_usuario():
-    if MODO_PUBLICO:
-        return USUARIOS_DADOS / usuario_atual().capitalize()
     return T.VAULT if usuario_atual() == "davibaruch" else USUARIOS_DADOS / usuario_atual().capitalize()
 
 
 def historico_usuario():
-    if MODO_PUBLICO or usuario_atual() != "davibaruch":
+    if usuario_atual() != "davibaruch":
         return vault_usuario() / "historico.json"
     return HISTORICO
 
@@ -129,7 +126,7 @@ def salvar_historico(itens):
     tmp = historico.with_suffix(".tmp")
     tmp.write_text(json.dumps(itens, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, historico)
-    if not MODO_PUBLICO and usuario_atual() == "davibaruch":
+    if usuario_atual() == "davibaruch":
         commit_historico()
 
 
@@ -489,7 +486,7 @@ def organizar(item_id):
                    else "Nota movida, mas o índice da área não foi alterado (não existe ou já continha o link).")
 
 # ---------------- login (usuario local) ----------------
-USUARIOS = (USUARIOS_DADOS / "usuarios.json") if MODO_PUBLICO else (AQUI / "usuarios.json")
+USUARIOS = AQUI / "usuarios.json"
 CHAVE = Path.home() / ".config" / "Transcritor_Audio" / ".chave_sessao"  # fora do repo, seguro
 NOME_OK = re.compile(r"^[A-Za-z0-9._-]{3,32}$")
 FALHAS = {}                            # ip -> [erros seguidos, bloqueado_ate]
@@ -497,9 +494,6 @@ LIVRES = {"static", "pagina_login", "auth_estado", "auth_registrar", "auth_entra
 
 
 def chave_secreta():
-    definida = os.getenv("TRANSCRITOR_SECRET_KEY", "").strip()
-    if definida:
-        return definida
     CHAVE.parent.mkdir(parents=True, exist_ok=True)
     try:
         return CHAVE.read_text(encoding="utf-8").strip()
@@ -516,7 +510,7 @@ def chave_secreta():
 
 app.secret_key = chave_secreta()
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
-                  SESSION_COOKIE_SECURE=os.getenv("TRANSCRITOR_COOKIE_SECURE", "0") == "1",
+                  SESSION_COOKIE_SECURE=False,
                   PERMANENT_SESSION_LIFETIME=timedelta(days=30))
 
 
@@ -526,19 +520,10 @@ def cabecalhos_seguranca(resposta):
     resposta.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     resposta.headers.setdefault("Referrer-Policy", "same-origin")
     resposta.headers.setdefault("Permissions-Policy", "camera=(), geolocation=(), payment=()")
-    if request.is_secure:
-        resposta.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return resposta
 
 
 def ler_usuarios():
-    if MODO_PUBLICO and not USUARIOS.exists():
-        legado = AQUI / "usuarios.json"
-        try:
-            if legado.exists():
-                return json.loads(legado.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            pass
     try:
         return json.loads(USUARIOS.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -596,8 +581,6 @@ def auth_estado():
 
 @app.post("/api/registrar")
 def auth_registrar():
-    if not app.config["ALLOW_REGISTRATION"]:
-        return jsonify(erro="O cadastro de novos usuários está desativado."), 403
     d = request.get_json(silent=True) or {}
     nome, senha = str(d.get("usuario", "")).strip(), str(d.get("senha", ""))
     if not NOME_OK.match(nome):
@@ -709,7 +692,6 @@ def excluir(item_id):
 
 
 if __name__ == "__main__":
-    host = os.getenv("TRANSCRITOR_HOST", "127.0.0.1")
     porta = int(os.getenv("TRANSCRITOR_PORT", "5055"))
     threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{porta}")).start()
-    app.run(host=host, port=porta, debug=False)
+    app.run(host="127.0.0.1", port=porta, debug=False)

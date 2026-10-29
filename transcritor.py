@@ -30,10 +30,7 @@ MODELOS = ("tiny", "base", "small", "medium")
 MODELO_PADRAO = "small"
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 OLLAMA_MODELO = "qwen2.5:3b"
-OLLAMA_ATIVO = os.getenv(
-    "TRANSCRITOR_OLLAMA_ENABLED",
-    "0" if os.getenv("TRANSCRITOR_PUBLIC_MODE", "0") == "1" else "1",
-) == "1"
+OLLAMA_ATIVO = os.getenv("TRANSCRITOR_OLLAMA_ENABLED", "1") == "1"
 IA_CACHE = Path(__file__).resolve().parent / "cache_interpretacoes.json"
 
 STOPWORDS = set("""

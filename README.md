@@ -24,22 +24,4 @@ py -m venv .venv
 ```
 
 O endereço local é `http://127.0.0.1:5055`.
-
-## Configuração pública
-
-Use `.env.public.example` como modelo. Para uma instalação pública, mantenha o cadastro fechado, desligue o Ollama e defina uma chave secreta real somente no ambiente do servidor.
-
-O serviço de produção pode ser iniciado com:
-
-```bash
-python servidor_producao.py
-```
-
-Com o cadastro fechado, crie contas no servidor sem expor a senha no histórico do terminal:
-
-```bash
-python provisionar_usuario.py DaviBaruch
-python provisionar_usuario.py Gabrielpacheco
-```
-
-`render.yaml` é apenas uma configuração de demonstração. O armazenamento local de serviços gratuitos pode ser temporário; não use a versão gratuita para dados importantes sem armazenamento persistente e backups.
+O servidor escuta somente em `127.0.0.1`; este repositório não inclui configuração de hospedagem online.
